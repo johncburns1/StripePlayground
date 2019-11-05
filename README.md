@@ -1,0 +1,1 @@
+# A sandbox to test out the Stripe .NET nuget.
