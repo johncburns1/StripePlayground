@@ -97,6 +97,41 @@ namespace StripePlayground.Stripe
         }
 
         /// <summary>
+        /// Gets a <see cref="SetupIntent"/> from Stripe.
+        /// </summary>
+        /// 
+        /// <param name="clientSecret">The <see cref="string"/> client secret from the <see cref="SetupIntent"/> we are
+        /// trying to retrieve.</param>
+        /// <param name="orderId">The <see cref="string"/> orderId of the order associated with the 
+        /// <see cref="SetupIntent"/> we are trying to get.</param>
+        /// 
+        /// <returns>The <see cref="SetupIntent"/> at the specified orderId.</returns>
+        public SetupIntent GetSetupIntent(string clientSecret, string orderId)
+        {
+            var order = orderClient.GetOrderById(orderId);
+
+            var setupIntentGetOptions = new SetupIntentGetOptions
+            {
+                ClientSecret = clientSecret
+            };
+
+            var requestOptions = new RequestOptions
+            {
+                ApiKey         = GetPublishableKey(),
+                IdempotencyKey = Guid.NewGuid().ToString()
+            };
+
+            var service = new SetupIntentService();
+
+            var setupIntent = service.Get(
+                setupIntentId:  order.SetupIntentId, 
+                options:        setupIntentGetOptions, 
+                requestOptions: requestOptions);
+
+            return setupIntent;
+        } 
+
+        /// <summary>
         /// Creates a payment method from a tokenized <see cref="Card"/>.
         /// </summary>
         /// 

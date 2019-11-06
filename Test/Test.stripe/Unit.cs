@@ -69,26 +69,30 @@ namespace Test.Stripe
         //}
 
         [Fact]
-        public SetupIntent CreateSetupIntent()
+        public void CreateSetupIntent()
         {
-            var paymentMethods = CreatePaymentMethods();
+            var cards = CreateCards();
+            var card  = cards[0];
+            var token = CreateCardToken(card);
             
-            foreach (var paymentMethod in paymentMethods)
+            var addresses = CreateAddresses();
+            var address   = addresses[0];
+
+            var order = orderClient.CreateOrder(new StripePlayground.Stripe.Models.Order
             {
-                var intentSecretClient = stripeClient.CreateSetupIntent(paymentMethod, "my-order", "my-account");
+                Id = "my-order"
+            });
 
-                Assert.Equal("my-order", intent.Metadata["OrderId"]);
-                Assert.Equal("my-account", intent.Metadata["AccountId"]);
-                Assert.Equal("off_session", intent.Usage);
-                Assert.Single<string>(intent.PaymentMethodTypes);
-                Assert.Equal("card", intent.PaymentMethodTypes[0]);
-                Assert.Equal("requires_payment_method", intent.Status);
-                Assert.NotNull(intent.ClientSecret);
-                Assert.NotEmpty(intent.ClientSecret);
-                Assert.Null(intent.PaymentMethod);
-            }
+            var paymentMethod      = CreatePaymentMethod(token, card.Name, address);
+            var intentSecretClient = stripeClient.CreateSetupIntent(paymentMethod, order.Id, "my-account");
+            
+            var intent = stripeClient.GetSetupIntent(intentSecretClient, order.Id);
 
-            return intent;
+            Assert.Equal("off_session", intent.Usage);
+            Assert.Single<string>(intent.PaymentMethodTypes);
+            Assert.Equal("card", intent.PaymentMethodTypes[0]);
+            Assert.Equal(intentSecretClient, intent.ClientSecret);
+            Assert.Equal(paymentMethod, intent.PaymentMethodId);
         }
 
         [Fact]
