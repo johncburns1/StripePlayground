@@ -21,58 +21,19 @@ namespace Test.Stripe
             this.stripeClient = new StripePlayground.Stripe.StripeClient(orderClient);
         }
 
-        //[Fact]
-        //public List<SetupIntent> ConfirmIntents() 
-        //{
-        //    var setupIntents = new List<SetupIntent> 
-        //    { 
-        //        CreateSetupIntent(),
-        //        CreateSetupIntent(),
-        //        CreateSetupIntent(),
-        //        CreateSetupIntent()
-        //    };
-
-        //    Assert.NotNull(setupIntents);
-        //    Assert.Equal(4, setupIntents.Count);
-
-        //    var paymentMethods = CreatePaymentMethods();
-
-        //    Assert.NotNull(paymentMethods);
-        //    Assert.Equal(4, paymentMethods.Count);
-
-        //    var confirmedIntents = new List<SetupIntent>();
-        //    var counter          = 0;
-            
-        //    foreach (var intent in setupIntents)
-        //    {
-        //        Assert.Equal("requires_payment_method", intent.Status);
-                
-        //        confirmedIntents.Add(client.ConfirmIntent(intent, paymentMethods[counter]));
-        //        counter++;
-        //    }
-
-        //    foreach (var intent in confirmedIntents)
-        //    {
-        //        Assert.NotNull(intent);
-        //        Assert.NotNull(intent.PaymentMethodId);
-        //        Assert.Equal("my-order", intent.Metadata["OrderId"]);
-        //        Assert.Equal("my-account", intent.Metadata["AccountId"]);
-        //        Assert.Equal("off_session", intent.Usage);
-        //        Assert.Single<string>(intent.PaymentMethodTypes);
-        //        Assert.Equal("card", intent.PaymentMethodTypes[0]);
-        //        Assert.NotEqual("requires_confirmation", intent.Status);
-        //        Assert.NotNull(intent.ClientSecret);
-        //        Assert.NotEmpty(intent.ClientSecret);
-        //    }
-
-        //    return confirmedIntents;
-        //}
-
         [Fact]
-        public void CreateSetupIntent()
+        public void CreateSuccessfulSetupIntent()
         {
-            var cards = CreateCards();
-            var card  = cards[0];
+            var card = new StripePlayground.Stripe.Models.Card
+            {
+                Name            = "Jackack",
+                Number          = "4111111111111111",
+                Cvc             = "275",
+                ExpirationMonth = 05,
+                ExpirationYear  = 20,
+                Description     = "this card should be confirmed."
+            };
+
             var token = CreateCardToken(card);
             
             var addresses = CreateAddresses();
@@ -80,7 +41,7 @@ namespace Test.Stripe
 
             var order = orderClient.CreateOrder(new StripePlayground.Stripe.Models.Order
             {
-                Id = "my-order"
+                Id = "my-order1"
             });
 
             var paymentMethod      = CreatePaymentMethod(token, card.Name, address);
@@ -93,6 +54,36 @@ namespace Test.Stripe
             Assert.Equal("card", intent.PaymentMethodTypes[0]);
             Assert.Equal(intentSecretClient, intent.ClientSecret);
             Assert.Equal(paymentMethod, intent.PaymentMethodId);
+            Assert.Equal("succeeded", intent.Status);
+
+            card = new StripePlayground.Stripe.Models.Card
+            {
+                Name            = "Jackack",
+                Number          = "371449635398431",
+                Cvc             = "275",
+                ExpirationMonth = 05,
+                ExpirationYear  = 20,
+                Description     = "this card should be confirmed."
+            };
+
+            token = CreateCardToken(card);
+
+            order = orderClient.CreateOrder(new StripePlayground.Stripe.Models.Order
+            {
+                Id = "my-order2"
+            });
+
+            paymentMethod      = CreatePaymentMethod(token, card.Name, address);
+            intentSecretClient = stripeClient.CreateSetupIntent(paymentMethod, order.Id, "my-account");
+
+            intent = stripeClient.GetSetupIntent(intentSecretClient, order.Id);
+
+            Assert.Equal("off_session", intent.Usage);
+            Assert.Single<string>(intent.PaymentMethodTypes);
+            Assert.Equal("card", intent.PaymentMethodTypes[0]);
+            Assert.Equal(intentSecretClient, intent.ClientSecret);
+            Assert.Equal(paymentMethod, intent.PaymentMethodId);
+            Assert.Equal("succeeded", intent.Status);
         }
 
         [Fact]
