@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Stripe;
 
 using StripePlayground.Stripe;
+using StripePlayground.Stripe.Models;
 
 using Xunit;
 
@@ -12,11 +13,12 @@ namespace Test.Stripe
     public class Unit
     {
         StripePlayground.Stripe.StripeClient stripeClient;
-        StripePlayground.Stripe.OrderClient orderClient;
+        OrderClient orderClient;
 
         public Unit()
         {
-            this.stripeClient = new StripePlayground.Stripe.StripeClient();
+            this.orderClient  = new OrderClient();
+            this.stripeClient = new StripePlayground.Stripe.StripeClient(orderClient);
         }
 
         //[Fact]
@@ -67,15 +69,64 @@ namespace Test.Stripe
         //}
 
         [Fact]
-        public List<string> CreatePaymentMethods()
+        public SetupIntent CreateSetupIntent()
         {
-            var tokens = CreateCardTokens();
+            var paymentMethods = CreatePaymentMethods();
+            
+            foreach (var paymentMethod in paymentMethods)
+            {
+                var intentSecretClient = stripeClient.CreateSetupIntent(paymentMethod, "my-order", "my-account");
 
-            Assert.NotNull(tokens);
-            Assert.NotEmpty(tokens);
-            Assert.Equal(4, tokens.Count);
+                Assert.Equal("my-order", intent.Metadata["OrderId"]);
+                Assert.Equal("my-account", intent.Metadata["AccountId"]);
+                Assert.Equal("off_session", intent.Usage);
+                Assert.Single<string>(intent.PaymentMethodTypes);
+                Assert.Equal("card", intent.PaymentMethodTypes[0]);
+                Assert.Equal("requires_payment_method", intent.Status);
+                Assert.NotNull(intent.ClientSecret);
+                Assert.NotEmpty(intent.ClientSecret);
+                Assert.Null(intent.PaymentMethod);
+            }
 
-            var addresses = new List<AddressOptions> 
+            return intent;
+        }
+
+        [Fact]
+        public void CreateCardTokens()
+        {
+            var cards = CreateCards();
+            
+            List<string> tokens = new List<string>();
+
+            foreach (var card in cards)
+            {
+                tokens.Add(CreateCardToken(card));
+            }
+
+            foreach(var token in tokens)
+            {
+                Assert.NotNull(token);
+                Assert.NotEmpty(token);
+            }
+        }
+
+        public string CreatePaymentMethod(
+            string         token, 
+            string         name,
+            AddressOptions address)
+        {
+            var paymentMethodId = stripeClient.CreatePaymentMethod(
+                token:   token,
+                address: address,
+                name:    name
+            );
+
+            return paymentMethodId;
+        }
+
+        public List<AddressOptions> CreateAddresses()
+        {
+            var addresses = new List<AddressOptions>
             {
                 new AddressOptions
                 {
@@ -99,61 +150,33 @@ namespace Test.Stripe
                 }
             };
 
-            var paymentMethods = new List<string>();
-            int counter        = 0;
-
-            foreach(var token in tokens)
-            {
-                paymentMethods.Add(stripeClient.CreatePaymentMethod(
-                    token:   token.Value,
-                    address: addresses[counter],
-                    name:    token.Key
-                ));
-                
-                counter++;
-            }
-
-            Assert.NotNull(paymentMethods);
-            Assert.NotEmpty(paymentMethods);
-
-            return paymentMethods;
+            return addresses;
         }
 
-        [Fact]
-        public SetupIntent CreateSetupIntent()
+        public string CreateCardToken(StripePlayground.Stripe.Models.Card card)
         {
-            var paymentMethods = CreatePaymentMethods();
-            
-            foreach (var paymentMethod in paymentMethods)
-            {
-                var intent = stripeClient.CreateSetupIntent(paymentMethod, "my-order", "my-account");
-            }
+            var token = StripePlayground.Stripe.StripeClient.CreateCardToken(
+                name:     card.Name,
+                number:   card.Number,
+                cvc:      card.Cvc,
+                expMonth: card.ExpirationMonth,
+                expYear:  card.ExpirationYear
+            );
 
-            Assert.Equal("my-order", intent.Metadata["OrderId"]);
-            Assert.Equal("my-account", intent.Metadata["AccountId"]);
-            Assert.Equal("off_session", intent.Usage);
-            Assert.Single<string>(intent.PaymentMethodTypes);
-            Assert.Equal("card", intent.PaymentMethodTypes[0]);
-            Assert.Equal("requires_payment_method", intent.Status);
-            Assert.NotNull(intent.ClientSecret);
-            Assert.NotEmpty(intent.ClientSecret);
-            Assert.Null(intent.PaymentMethod);
-
-            return intent;
+            return token;
         }
 
-        [Fact]
-        public Dictionary<string, string> CreateCardTokens()
+        public List<StripePlayground.Stripe.Models.Card> CreateCards()
         {
-            List<StripePlayground.Stripe.Models.Card> cards = new List<StripePlayground.Stripe.Models.Card> ();
+            List<StripePlayground.Stripe.Models.Card> cards = new List<StripePlayground.Stripe.Models.Card>();
 
             cards.Add(new StripePlayground.Stripe.Models.Card
             {
                 Name            = "Jack C Burns",
                 Number          = "4000002500003155",
                 Cvc             = "618",
-                ExpirationMonth = (long) 05,
-                ExpirationYear  = (long) 2021,
+                ExpirationMonth = (long)05,
+                ExpirationYear  = (long)2021,
                 Description     = "This test card requires authentication for one-time payments. " +
                     "However, if you set up this card using the Setup Intents API " +
                     "and use the saved card for subsequent payments, " +
@@ -165,8 +188,8 @@ namespace Test.Stripe
                 Name            = "Jill B Johns",
                 Number          = "4000002760003184",
                 Cvc             = "210",
-                ExpirationMonth = (long) 12,
-                ExpirationYear  = (long) 2025,
+                ExpirationMonth = (long)12,
+                ExpirationYear  = (long)2025,
                 Description     = "This test card requires authentication on all transactions."
             });
 
@@ -175,8 +198,8 @@ namespace Test.Stripe
                 Name            = "Zima C Blu",
                 Number          = "4000008260003178",
                 Cvc             = "216",
-                ExpirationMonth = (long) 10,
-                ExpirationYear  = (long) 2021,
+                ExpirationMonth = (long)10,
+                ExpirationYear  = (long)2021,
                 Description     = "This test card requires authentication, " +
                     "but payments will be declined with an insufficient_funds " +
                     "failure code after successful authentication."
@@ -187,33 +210,14 @@ namespace Test.Stripe
                 Name            = "Yadier D Molina",
                 Number          = "4000000000003055",
                 Cvc             = "417",
-                ExpirationMonth = (long) 01,
-                ExpirationYear  = (long) 2020,
+                ExpirationMonth = (long)01,
+                ExpirationYear  = (long)2020,
                 Description     = "This test card supports authentication via 3D Secure 2, " +
                     "but does not require it. Payments using this card do not require additional " +
                     "authentication in test mode unless your test mode Radar rules request authentication."
             });
 
-            Dictionary<string, string> tokens = new Dictionary<string, string>();
-            
-            foreach(var card in cards)
-            {
-                tokens.Add(card.Name, StripePlayground.Stripe.StripeClient.CreateCardToken(
-                    name:     card.Name,
-                    number:   card.Number,
-                    cvc:      card.Cvc,
-                    expMonth: card.ExpirationMonth,
-                    expYear:  card.ExpirationYear
-                ));
-            }
-
-            foreach(var token in tokens)
-            {
-                Assert.NotNull(token.Value);
-                Assert.NotEmpty(token.Value);
-            }
-
-            return tokens;
+            return cards;
         }
     }
 }

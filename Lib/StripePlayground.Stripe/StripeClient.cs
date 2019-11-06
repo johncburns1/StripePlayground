@@ -24,6 +24,14 @@ namespace StripePlayground.Stripe
         }
 
         /// <summary>
+        /// Constructor for Stripe server.
+        /// </summary>
+        public StripeClient(OrderClient orderClient)
+        {
+            this.orderClient = orderClient;
+        }
+
+        /// <summary>
         /// Returns the <see cref="string"/> Stripe publishable api key.
         /// </summary>
         /// 
